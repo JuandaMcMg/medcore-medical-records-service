@@ -1,0 +1,239 @@
+// controllers/MedicalRecordController.js
+const { PrismaClient } = require("@prisma/client");
+const prisma = new PrismaClient();
+
+/**
+ * Crear un nuevo registro médico
+ */
+const createMedicalRecord = async (req, res) => {
+  try {
+    const { patientId, physicianId, symptoms, diagnosis, treatment, notes } = req.body;
+
+    // Validaciones básicas
+    if (!patientId || !physicianId || !symptoms) {
+      return res.status(400).json({
+        message: "Se requieren patientId, physicianId y symptoms",
+        service: "medical-records-service"
+      });
+    }
+
+    // Crear el registro médico
+    const medicalRecord = await prisma.medicalRecord.create({
+      data: {
+        patientId,
+        physicianId,
+        symptoms,
+        diagnosis,
+        treatment,
+        notes,
+        status: "active"
+      }
+    });
+
+    return res.status(201).json({
+      message: "Registro médico creado exitosamente",
+      data: medicalRecord,
+      service: "medical-records-service"
+    });
+  } catch (error) {
+    console.error("Error al crear registro médico:", error);
+    return res.status(500).json({
+      message: "Error al crear el registro médico",
+      error: process.env.NODE_ENV === "production" ? {} : error.message,
+      service: "medical-records-service"
+    });
+  }
+};
+
+/**
+ * Obtener un registro médico por ID
+ */
+const getMedicalRecordById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Buscar el registro médico con prescripciones y resultados de laboratorio
+    const medicalRecord = await prisma.medicalRecord.findUnique({
+      where: { id },
+      include: {
+        prescriptions: true,
+        labResults: true
+      }
+    });
+
+    if (!medicalRecord) {
+      return res.status(404).json({
+        message: "Registro médico no encontrado",
+        service: "medical-records-service"
+      });
+    }
+
+    return res.status(200).json({
+      data: medicalRecord,
+      service: "medical-records-service"
+    });
+  } catch (error) {
+    console.error("Error al obtener registro médico:", error);
+    return res.status(500).json({
+      message: "Error al obtener el registro médico",
+      error: process.env.NODE_ENV === "production" ? {} : error.message,
+      service: "medical-records-service"
+    });
+  }
+};
+
+/**
+ * Listar registros médicos con filtros opcionales
+ */
+const listMedicalRecords = async (req, res) => {
+  try {
+    const { patientId, physicianId, status, fromDate, toDate } = req.query;
+
+    // Construir el objeto de filtros dinámicamente
+    const where = {};
+    
+    if (patientId) where.patientId = patientId;
+    if (physicianId) where.physicianId = physicianId;
+    if (status) where.status = status;
+    
+    // Filtrado por rango de fechas
+    if (fromDate || toDate) {
+      where.date = {};
+      if (fromDate) where.date.gte = new Date(fromDate);
+      if (toDate) where.date.lte = new Date(toDate);
+    }
+
+    // Obtener los registros médicos paginados
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Contar total de registros que coinciden con el filtro
+    const totalCount = await prisma.medicalRecord.count({ where });
+
+    // Obtener los registros médicos
+    const medicalRecords = await prisma.medicalRecord.findMany({
+      where,
+      include: {
+        prescriptions: true,
+        labResults: true
+      },
+      skip,
+      take: limit,
+      orderBy: { date: 'desc' }
+    });
+
+    return res.status(200).json({
+      data: medicalRecords,
+      pagination: {
+        total: totalCount,
+        pages: Math.ceil(totalCount / limit),
+        page,
+        limit
+      },
+      service: "medical-records-service"
+    });
+  } catch (error) {
+    console.error("Error al listar registros médicos:", error);
+    return res.status(500).json({
+      message: "Error al listar los registros médicos",
+      error: process.env.NODE_ENV === "production" ? {} : error.message,
+      service: "medical-records-service"
+    });
+  }
+};
+
+/**
+ * Actualizar un registro médico
+ */
+const updateMedicalRecord = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { symptoms, diagnosis, treatment, notes, status } = req.body;
+
+    // Verificar que el registro existe
+    const existingRecord = await prisma.medicalRecord.findUnique({
+      where: { id }
+    });
+
+    if (!existingRecord) {
+      return res.status(404).json({
+        message: "Registro médico no encontrado",
+        service: "medical-records-service"
+      });
+    }
+
+    // Actualizar el registro
+    const updatedRecord = await prisma.medicalRecord.update({
+      where: { id },
+      data: {
+        symptoms: symptoms ?? existingRecord.symptoms,
+        diagnosis: diagnosis ?? existingRecord.diagnosis,
+        treatment: treatment ?? existingRecord.treatment,
+        notes: notes ?? existingRecord.notes,
+        status: status ?? existingRecord.status
+      }
+    });
+
+    return res.status(200).json({
+      message: "Registro médico actualizado exitosamente",
+      data: updatedRecord,
+      service: "medical-records-service"
+    });
+  } catch (error) {
+    console.error("Error al actualizar registro médico:", error);
+    return res.status(500).json({
+      message: "Error al actualizar el registro médico",
+      error: process.env.NODE_ENV === "production" ? {} : error.message,
+      service: "medical-records-service"
+    });
+  }
+};
+
+/**
+ * Archivar un registro médico (soft delete)
+ */
+const archiveMedicalRecord = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verificar que el registro existe
+    const existingRecord = await prisma.medicalRecord.findUnique({
+      where: { id }
+    });
+
+    if (!existingRecord) {
+      return res.status(404).json({
+        message: "Registro médico no encontrado",
+        service: "medical-records-service"
+      });
+    }
+
+    // Actualizar el estado a "archived"
+    const archivedRecord = await prisma.medicalRecord.update({
+      where: { id },
+      data: { status: "archived" }
+    });
+
+    return res.status(200).json({
+      message: "Registro médico archivado exitosamente",
+      data: archivedRecord,
+      service: "medical-records-service"
+    });
+  } catch (error) {
+    console.error("Error al archivar registro médico:", error);
+    return res.status(500).json({
+      message: "Error al archivar el registro médico",
+      error: process.env.NODE_ENV === "production" ? {} : error.message,
+      service: "medical-records-service"
+    });
+  }
+};
+
+module.exports = {
+  createMedicalRecord,
+  getMedicalRecordById,
+  listMedicalRecords,
+  updateMedicalRecord,
+  archiveMedicalRecord
+};

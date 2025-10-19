@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "name": "medcore-medical-records-service",
+  "builds": [
+    {
+      "src": "src/index.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "src/index.js"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production",
+    "PORT": "3005",
+    "MONGODB_URI": "@mongodb-uri",
+    "JWT_SECRET": "@jwt-secret",
+    "USER_SERVICE_URL": "@user-service-url",
+    "ORGANIZATION_SERVICE_URL": "@organization-service-url",
+    "AUDIT_SERVICE_URL": "@audit-service-url"
+  }
+}

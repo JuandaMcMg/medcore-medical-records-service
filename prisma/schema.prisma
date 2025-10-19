@@ -1,0 +1,67 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("MONGODB_URI")
+}
+
+// Modelo para registros médicos
+model MedicalRecord {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  patientId   String   @db.ObjectId
+  physicianId String   @db.ObjectId
+  date        DateTime @default(now())
+  symptoms    String
+  diagnosis   String?
+  treatment   String?
+  notes       String?
+  status      String   @default("active") // "active", "archived"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relaciones virtuales para navegación en Prisma
+  // (No se almacenan realmente en MongoDB, son solo para Prisma)
+  prescriptions Prescription[]
+  labResults    LabResult[]
+}
+
+// Modelo para prescripciones
+model Prescription {
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  medicalRecordId  String    @db.ObjectId
+  medication       String
+  dosage           String
+  frequency        String
+  duration         String
+  instructions     String?
+  prescriptionDate DateTime  @default(now())
+  expirationDate   DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relación con el registro médico
+  medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id])
+}
+
+// Modelo para resultados de laboratorio
+model LabResult {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  medicalRecordId String   @db.ObjectId
+  testType        String
+  result          String
+  referenceRange  String?
+  labName         String?
+  testDate        DateTime
+  resultDate      DateTime @default(now())
+  comments        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relación con el registro médico
+  medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id])
+}
