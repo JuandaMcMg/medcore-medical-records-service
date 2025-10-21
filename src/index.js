@@ -7,11 +7,7 @@ const morgan = require("morgan");
 const bodyParser = require("body-parser");
 const { connectDatabase } = require("./database/database");
 const { sanitizeInputs } = require("./middlewares/sanitizeMiddleware");
-
-// Importar rutas
-const medicalRecordRoutes = require("./routes/medicalRecordRoutes");
-const prescriptionRoutes = require("./routes/prescriptionRoutes");
-const labResultRoutes = require("./routes/labResultRoutes");
+const routes = require("./routes/routes")
 
 const port = process.env.PORT || 3005;
 const app = express();
@@ -40,10 +36,8 @@ app.get("/health", (_req, res) =>
   })
 );
 
-// Rutas del servicio
-app.use('/api/v1/medical-records', medicalRecordRoutes);
-app.use('/api/v1/prescriptions', prescriptionRoutes);
-app.use('/api/v1/lab-results', labResultRoutes);
+app.use('/api/v1', routes);
+
 
 // Error handling middleware
 app.use((err, req, res, next) => {

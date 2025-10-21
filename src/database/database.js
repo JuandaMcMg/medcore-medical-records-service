@@ -1,6 +1,6 @@
 // database/database.js
 const mongoose = require("mongoose");
-const { PrismaClient } = require("@prisma/client");
+const { PrismaClient } = require("../generated/prisma");
 
 const prisma = new PrismaClient();
 

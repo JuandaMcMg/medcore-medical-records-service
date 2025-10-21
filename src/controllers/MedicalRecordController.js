@@ -1,31 +1,35 @@
 // controllers/MedicalRecordController.js
-const { PrismaClient } = require("@prisma/client");
+const { PrismaClient } = require("../generated/prisma");
 const prisma = new PrismaClient();
+const {ensurePatientExists} = require("../services/integrations")
 
 /**
  * Crear un nuevo registro médico
  */
 const createMedicalRecord = async (req, res) => {
   try {
-    const { patientId, physicianId, symptoms, diagnosis, treatment, notes } = req.body;
-
+    const { patientId, symptoms, diagnosis, treatment, notes } = req.body;
+    const physicianId = req.user.id;  
     // Validaciones básicas
-    if (!patientId || !physicianId || !symptoms) {
+    if (!patientId || !symptoms) {
       return res.status(400).json({
-        message: "Se requieren patientId, physicianId y symptoms",
+        message: "Se requieren patientId, y symptoms",
         service: "medical-records-service"
       });
     }
 
+    // Valida paciente por HTTP (ID = frontera entre MS)
+    const ok = await ensurePatientExists(patientId, req.headers.authorization || "");
+    if (!ok) return res.status(404).json({ message: "Paciente no existe" });
+
     // Crear el registro médico
     const medicalRecord = await prisma.medicalRecord.create({
       data: {
-        patientId,
-        physicianId,
+        patientId: String(patientId),
         symptoms,
-        diagnosis,
-        treatment,
-        notes,
+        diagnosis: diagnosis?? null,
+        treatment: treatment?? null,
+        notes: notes ?? null,
         status: "active"
       }
     });
@@ -67,11 +71,13 @@ const getMedicalRecordById = async (req, res) => {
         service: "medical-records-service"
       });
     }
-
-    return res.status(200).json({
-      data: medicalRecord,
-      service: "medical-records-service"
+    // Trae documentos del encounter (tabla unificada Document)
+    const documents = await prisma.document.findMany({
+      where: { encounterId: String(id), patientId: String(medicalRecord.patientId), deletedAt: null },
+      orderBy: { createdAt: "desc" }
     });
+
+    return res.status(200).json({data: medicalRecord, documents, encounterId: id,});
   } catch (error) {
     console.error("Error al obtener registro médico:", error);
     return res.status(500).json({

@@ -15,9 +15,13 @@ const verifyToken = (req, res, next) => {
 
     // Verificar el token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const normalizedId = decoded.id || decoded._id || decoded.userId || decoded.sub || null;
+    if (!normalizedId) return res.status(400).json({ message: "El token no contiene un identificador de usuario" });
+
+
     
     // Añadir la información del usuario decodificada al request
-    req.user = decoded;
+    req.user = {...decoded, id: String(normalizedId)};
     
     return next();
   } catch (error) {
@@ -44,6 +48,23 @@ const verifyToken = (req, res, next) => {
   }
 };
 
+const authorizeRoles = (...rolesPermitidos) => (req, res, next) => {
+  const role = req.user?.role;
+  if (!role || !rolesPermitidos.includes(role)) {
+    return res.status(403).json({ message: "Forbidden (role)" });
+  }
+  next();
+};
+
+/*const { hasPermission } = require("./permissions");
+const permission = (permName) => (req, res, next) => {
+  if (!hasPermission(req.user?.role, permName)) {
+    return res.status(403).json({ message: `Forbidden (permission: ${permName})` });
+  }
+  next();
+};*/
+
 module.exports = {
-  verifyToken
+  verifyToken,
+  authorizeRoles
 };

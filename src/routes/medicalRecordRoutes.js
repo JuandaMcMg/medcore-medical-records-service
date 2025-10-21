@@ -1,6 +1,6 @@
 // routes/medicalRecordRoutes.js
 const express = require("express");
-const { verifyToken } = require("../middlewares/authMiddleware");
+const { verifyToken, authorizeRoles } = require("../middlewares/authMiddleware");
 const { sanitizeInputs } = require("../middlewares/sanitizeMiddleware");
 const {
   createMedicalRecord,
@@ -12,39 +12,21 @@ const {
 
 const router = express.Router();
 
-/**
- * @route POST /api/v1/medical-records
- * @desc Crear un nuevo registro médico
- * @access Privado - Requiere autenticación
- */
-router.post("/", [verifyToken, sanitizeInputs], createMedicalRecord);
+router.use(verifyToken)
 
-/**
- * @route GET /api/v1/medical-records/:id
- * @desc Obtener un registro médico por ID
- * @access Privado - Requiere autenticación
- */
-router.get("/:id", verifyToken, getMedicalRecordById);
+// POST http://localhost:3005/api/v1//medical-records/ Crear Historia
+router.post("/", authorizeRoles("MEDICO", "ADMINISTRADOR"),sanitizeInputs, createMedicalRecord);
 
-/**
- * @route GET /api/v1/medical-records
- * @desc Listar registros médicos con filtros
- * @access Privado - Requiere autenticación
- */
-router.get("/", verifyToken, listMedicalRecords);
+// GET http://localhost:3005/api/v1//medical-records/:id Ver Historia
+router.get("/:id", authorizeRoles("MEDICO", "ADMINISTRADOR"), getMedicalRecordById);
 
-/**
- * @route PUT /api/v1/medical-records/:id
- * @desc Actualizar un registro médico
- * @access Privado - Requiere autenticación
- */
-router.put("/:id", [verifyToken, sanitizeInputs], updateMedicalRecord);
+// GET http://localhost:3005/api/v1//medical-records/ Listar Historias
+router.get("/", authorizeRoles("MEDICO", "ADMINISTRADOR"), listMedicalRecords);
 
-/**
- * @route DELETE /api/v1/medical-records/:id
- * @desc Archivar un registro médico (soft delete)
- * @access Privado - Requiere autenticación
- */
-router.delete("/:id", verifyToken, archiveMedicalRecord);
+// PUT http://localhost:3005/api/v1//medical-records/:Id
+router.put("/:id", authorizeRoles("MEDICO", "ADMINISTRADOR"),sanitizeInputs, updateMedicalRecord);
+
+// DELETE http://localhost:3005/api/v1//medical-records/:id Archivar Historia 
+router.delete("/:id", authorizeRoles("MEDICO", "ADMINISTRADOR"), archiveMedicalRecord);
 
 module.exports = router;

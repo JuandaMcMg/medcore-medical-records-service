@@ -3,11 +3,25 @@
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "mongodb"
   url      = env("MONGODB_URI")
+}
+
+//Estado de diagnosticos
+enum diagnosticState {
+  ACTIVE
+  ARCHIVED
+  DELETED
+}
+
+enum DocCategory {
+  GENERAL
+  DIAGNOSTIC_ATTACHMENT
+  LAB
 }
 
 // Modelo para registros médicos
@@ -28,6 +42,7 @@ model MedicalRecord {
   // (No se almacenan realmente en MongoDB, son solo para Prisma)
   prescriptions Prescription[]
   labResults    LabResult[]
+  diagnostic    Diagnostics[]
 }
 
 // Modelo para prescripciones
@@ -64,4 +79,53 @@ model LabResult {
 
   // Relación con el registro médico
   medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id])
+}
+
+model Diagnostics {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  patientId       String          @db.ObjectId
+  doctorId        String          @db.ObjectId
+  medicalRecordId String          @db.ObjectId
+  title           String
+  description     String
+  diagnosis       String
+  treatment       String
+  observations    String?
+  nextAppointment DateTime?
+  state           diagnosticState @default(ACTIVE)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  //Relaciones
+  medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id])
+  documents     Document[]
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([medicalRecordId])
+}
+
+model Document {
+  id              String      @id @default(auto()) @map("_id") @db.ObjectId
+  diagnosticId    String      @db.ObjectId
+  medicalRecordId String
+  patientId       String      @db.ObjectId
+  category        DocCategory @default(GENERAL)
+  filename        String //Nombre original del archivo
+  storeFilename   String //Nombre del archivo en el almacenamiento
+  filePath        String //Ruta del archivo en el almacenamiento
+  fileType        String //pdf, jpg, png, etc.
+  mimeType        String //application/pdf, image/jpeg, etc.
+  fileSize        Int //Tamaño del archivo en bytes
+  description     String?
+  uploadedBy      String      @db.ObjectId
+  createdAt       DateTime    @default(now())
+
+  //Relaciones
+  diagnostic Diagnostics @relation(fields: [diagnosticId], references: [id], onDelete: Cascade)
+
+  @@index([diagnosticId])
+  @@index([patientId])
+  @@index([category])
+  @@index([medicalRecordId])
 }
