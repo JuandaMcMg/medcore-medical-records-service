@@ -7,13 +7,13 @@ const prisma = new PrismaClient();
 // Configuración de conexión a MongoDB
 const connectDatabase = async () => {
   try {
-    const MONGODB_URI = process.env.MONGODB_URI;
+    const DATABASE_URL = process.env.DATABASE_URL;
 
-    if (!MONGODB_URI) {
-      throw new Error("Variable de entorno MONGODB_URI no definida");
+    if (!DATABASE_URL) {
+      throw new Error("Variable de entorno DATABASE_URL no definida");
     }
 
-    await mongoose.connect(MONGODB_URI, {
+    await mongoose.connect(DATABASE_URL, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
