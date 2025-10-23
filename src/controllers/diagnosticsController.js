@@ -1,4 +1,3 @@
-// src/controllers/PatientController.js
 const diagnosticService = require("../services/diagnostic.service");
 const { ensurePatientExists, ensureDoctorExists, auditLog } = require("../services/integrations");
 

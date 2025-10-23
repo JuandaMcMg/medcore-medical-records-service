@@ -119,6 +119,7 @@ model Document {
   mimeType        String //application/pdf, image/jpeg, etc.
   fileSize        Int //Tamaño del archivo en bytes
   description     String?
+  deleteAt        DateTime?
   uploadedBy      String      @db.ObjectId
   createdAt       DateTime    @default(now())
 
@@ -129,4 +130,5 @@ model Document {
   @@index([patientId])
   @@index([category])
   @@index([medicalRecordId])
+  @@index([deleteAt])
 }

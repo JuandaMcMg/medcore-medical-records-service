@@ -1,7 +1,7 @@
 // controllers/MedicalRecordController.js
 const { PrismaClient } = require("../generated/prisma");
 const prisma = new PrismaClient();
-const {ensurePatientExists} = require("../services/integrations")
+const {ensurePatientExists, ensureDoctorExists, auditLog} = require("../services/integrations")
 
 /**
  * Crear un nuevo registro médico
@@ -9,8 +9,10 @@ const {ensurePatientExists} = require("../services/integrations")
 const createMedicalRecord = async (req, res) => {
   try {
     const { patientId, symptoms, diagnosis, treatment, notes } = req.body;
-    const physicianId = req.user.id;  
-    // Validaciones básicas
+    const physicianId = req.user.id;
+    const auth = req.headers.authorization || "";
+
+    // Validaciones
     if (!patientId || !symptoms) {
       return res.status(400).json({
         message: "Se requieren patientId, y symptoms",
@@ -19,13 +21,19 @@ const createMedicalRecord = async (req, res) => {
     }
 
     // Valida paciente por HTTP (ID = frontera entre MS)
-    const ok = await ensurePatientExists(patientId, req.headers.authorization || "");
-    if (!ok) return res.status(404).json({ message: "Paciente no existe" });
+    const okPatient = await ensurePatientExists(patientId, auth);
+    if (!okPatient) return res.status(404).json({ message: "Paciente no existe" });
+
+    // Valida Doctor por HTTP (ID = frontera entre MS)
+    const okDoct = await ensureDoctorExists(physicianId, auth);
+    if (!okDoct) return res.status(404).json({ message: "El usuario autenticado no es médico" });
+    
 
     // Crear el registro médico
     const medicalRecord = await prisma.medicalRecord.create({
       data: {
         patientId: String(patientId),
+        physicianId: String(physicianId),
         symptoms,
         diagnosis: diagnosis?? null,
         treatment: treatment?? null,
@@ -34,6 +42,9 @@ const createMedicalRecord = async (req, res) => {
       }
     });
 
+    //AuditLog
+    await auditLog({ action:"MEDICAL_RECORD_CREATE", entity:"MedicalRecord", entityId: medicalRecord.id, actorId: req.user.id }, auth);
+    
     return res.status(201).json({
       message: "Registro médico creado exitosamente",
       data: medicalRecord,

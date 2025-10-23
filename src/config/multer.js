@@ -27,9 +27,10 @@ const diagnosticStorage = multer.diskStorage({
     cb(null, dest);
   },
   filename: (req, file, cb) => {
-    const patientId = req.params.patientId || req.body.patientId || "unknown";
-    const ext = path.extname(file.originalname);
-    const name = `diagnostic-${patientId}-${Date.now()}-${Math.round(Math.random()*1e9)}${ext}`;
+    const rawPid = req.params.patientId || req.body.patientId || "unknown";
+    const patientId = String(rawPid).replace(/[^a-zA-Z0-9_-]/g, ""); // <- sanitiza
+    const ext = (path.extname(file.originalname) || "").toLowerCase();
+    const name = `document-${patientId}-${Date.now()}-${Math.round(Math.random()*1e9)}${ext}`;
     cb(null, name);
   },
 });
@@ -42,8 +43,9 @@ const documentStorage = multer.diskStorage({
     cb(null, dest);
   },
   filename: (req, file, cb) => {
-    const patientId = req.body.patientId || req.params.patientId || "unknown";
-    const ext = path.extname(file.originalname);
+    const rawPid = req.params.patientId || req.body.patientId || "unknown";
+    const patientId = String(rawPid).replace(/[^a-zA-Z0-9_-]/g, ""); // <- sanitiza
+    const ext = (path.extname(file.originalname) || "").toLowerCase();
     const name = `document-${patientId}-${Date.now()}-${Math.round(Math.random()*1e9)}${ext}`;
     cb(null, name);
   },
