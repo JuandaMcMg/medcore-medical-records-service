@@ -19,13 +19,27 @@ const createMedicalRecord = async (req, res) => {
     }
 
     // Valida paciente por HTTP (ID = frontera entre MS)
+    console.log('[createMedicalRecord] Validando paciente:', patientId);
+    console.log('[createMedicalRecord] Authorization header presente:', !!req.headers.authorization);
+    
     const ok = await ensurePatientExists(patientId, req.headers.authorization || "");
-    if (!ok) return res.status(404).json({ message: "Paciente no existe" });
+    
+    if (!ok) {
+      console.error('[createMedicalRecord] Paciente no encontrado en la validación');
+      return res.status(404).json({ 
+        message: "Paciente no existe", 
+        patientId: patientId,
+        tip: "Verifica que el ID sea correcto y que el servicio de usuarios esté disponible."
+      });
+    }
+    
+    console.log('[createMedicalRecord] Paciente validado correctamente');
 
     // Crear el registro médico
     const medicalRecord = await prisma.medicalRecord.create({
       data: {
         patientId: String(patientId),
+        physicianId: String(physicianId), // Añadimos el physicianId del usuario autenticado
         symptoms,
         diagnosis: diagnosis?? null,
         treatment: treatment?? null,

@@ -1,10 +1,10 @@
-// src/controllers/PatientController.js
+// src/controllers/diagnosticsController.js
 const diagnosticService = require("../services/diagnostic.service");
 const { ensurePatientExists, ensureDoctorExists, auditLog } = require("../services/integrations");
 
 /**
- * POST /patients/:patientId/diagnostics
- * Body: { title, description, diagnosis, treatment, observations?, nextAppointment? }
+ * POST /diagnostics/:patientId
+ * Body: { title, description, diagnosis, treatment, observations?, nextAppointment?, medicalRecordId }
  * Files: req.files (multer)  -> campo "documents" (hasta 5)
  */
 const createDiagnostic = async (req, res) => {
