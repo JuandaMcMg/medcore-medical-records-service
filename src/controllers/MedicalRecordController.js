@@ -21,12 +21,25 @@ const createMedicalRecord = async (req, res) => {
     }
 
     // Valida paciente por HTTP (ID = frontera entre MS)
+    console.log('[createMedicalRecord] Validando paciente:', patientId);
+    console.log('[createMedicalRecord] Authorization header presente:', !!req.headers.authorization);
+    
     const okPatient = await ensurePatientExists(patientId, auth);
     if (!okPatient) return res.status(404).json({ message: "Paciente no existe" });
 
     // Valida Doctor por HTTP (ID = frontera entre MS)
     const okDoct = await ensureDoctorExists(physicianId, auth);
-    if (!okDoct) return res.status(404).json({ message: "El usuario autenticado no es médico" });
+    
+    if (!okDoct) {
+      console.error('[createMedicalRecord] Paciente no encontrado en la validación');
+      return res.status(404).json({ 
+        message: "El usuario autenticado no es médico", 
+        patientId: patientId,
+        tip: "Verifica que el ID sea correcto y que el servicio de usuarios esté disponible."
+      });
+    }
+    
+    console.log('[createMedicalRecord] Paciente validado correctamente');
     
 
     // Crear el registro médico

@@ -18,6 +18,21 @@ class DiagnosticService {
       if (!medicalRecordId) {
         throw new Error("medicalRecordId es obligatorio para crear el diagnóstico");
       }
+
+      // Validar que el registro médico existe
+      const medicalRecord = await prisma.medicalRecord.findUnique({
+        where: { id: String(medicalRecordId) }
+      });
+
+      if (!medicalRecord) {
+        throw new Error("El registro médico especificado no existe");
+      }
+
+      // Validar que el registro médico pertenece al paciente correcto
+      if (medicalRecord.patientId !== String(patientId)) {
+        throw new Error("El registro médico no corresponde al paciente especificado");
+      }
+
         //crear diagnóstico + documentos
         const diagnostic = await prisma.$transaction(async (tx) => {
             //1 Crear diagnóstico
