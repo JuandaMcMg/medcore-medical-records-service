@@ -94,6 +94,32 @@ class DiagnosticService {
       throw error;
     }
   }
+
+  /**
+   * Obtiene todos los diagnósticos asociados a una historia clínica
+   * @param {string} medicalRecordId ID del registro médico
+   */
+  async getByMedicalRecord(medicalRecordId) {
+    try {
+      const diagnostics = await prisma.diagnostics.findMany({
+        where: { 
+          medicalRecordId: String(medicalRecordId),
+          state: 'ACTIVE' // Solo diagnósticos activos
+        },
+        include: {
+          documents: true // Incluir documentos asociados
+        },
+        orderBy: {
+          createdAt: 'desc' // Más recientes primero
+        }
+      });
+
+      return diagnostics;
+    } catch (error) {
+      console.error("Error obteniendo diagnósticos por medical record:", error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new DiagnosticService();

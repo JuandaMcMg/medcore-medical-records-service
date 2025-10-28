@@ -21,9 +21,6 @@ const createMedicalRecord = async (req, res) => {
     }
 
     // Valida paciente por HTTP (ID = frontera entre MS)
-    console.log('[createMedicalRecord] Validando paciente:', patientId);
-    console.log('[createMedicalRecord] Authorization header presente:', !!req.headers.authorization);
-    
     const okPatient = await ensurePatientExists(patientId, auth);
     if (!okPatient) return res.status(404).json({ message: "Paciente no existe" });
 
@@ -31,15 +28,12 @@ const createMedicalRecord = async (req, res) => {
     const okDoct = await ensureDoctorExists(physicianId, auth);
     
     if (!okDoct) {
-      console.error('[createMedicalRecord] Paciente no encontrado en la validación');
       return res.status(404).json({ 
         message: "El usuario autenticado no es médico", 
         patientId: patientId,
         tip: "Verifica que el ID sea correcto y que el servicio de usuarios esté disponible."
       });
     }
-    
-    console.log('[createMedicalRecord] Paciente validado correctamente');
     
 
     // Crear el registro médico
@@ -95,13 +89,22 @@ const getMedicalRecordById = async (req, res) => {
         service: "medical-records-service"
       });
     }
-    // Trae documentos del encounter (tabla unificada Document)
+    // Trae documentos del medical record
     const documents = await prisma.document.findMany({
-      where: { encounterId: String(id), patientId: String(medicalRecord.patientId), deletedAt: null },
+      where: { 
+        medicalRecordId: String(id), 
+        patientId: String(medicalRecord.patientId), 
+        deleteAt: null 
+      },
       orderBy: { createdAt: "desc" }
     });
 
-    return res.status(200).json({data: medicalRecord, documents, encounterId: id,});
+    return res.status(200).json({
+      data: medicalRecord, 
+      documents, 
+      medicalRecordId: id,
+      service: "medical-records-service"
+    });
   } catch (error) {
     console.error("Error al obtener registro médico:", error);
     return res.status(500).json({

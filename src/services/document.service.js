@@ -28,31 +28,58 @@ async function createDocument({ userId, body, file }) {
   if (!patientId || !isObjectId(patientId)) {
     const e = new Error("patientId inválido"); e.status = 400; throw e;
   }
-  if (!diagnosticId || !isObjectId(diagnosticId)) {
-    const e = new Error("diagnosticId inválido (requerido)"); e.status = 400; throw e;
+  // diagnosticId es opcional para documentos generales
+  if (diagnosticId && !isObjectId(diagnosticId)) {
+    const e = new Error("diagnosticId inválido"); e.status = 400; throw e;
   }
-  if (!medicalRecordId) {
-    const e = new Error("medicalRecordId es obligatorio"); e.status = 400; throw e;
+  // medicalRecordId es opcional para documentos generales del paciente
+  if (medicalRecordId && !isObjectId(medicalRecordId)) {
+    const e = new Error("medicalRecordId inválido"); e.status = 400; throw e;
+  }
+
+  // Validar que existan medicalRecordId y diagnosticId
+  if (!medicalRecordId || !isObjectId(medicalRecordId)) {
+    const e = new Error("medicalRecordId es obligatorio y debe ser válido"); e.status = 400; throw e;
+  }
+  if (!diagnosticId || !isObjectId(diagnosticId)) {
+    const e = new Error("diagnosticId es obligatorio y debe ser válido"); e.status = 400; throw e;
+  }
+
+  // Verificar que el diagnóstico existe y pertenece al paciente
+  const diagnostic = await prisma.diagnostics.findFirst({
+    where: {
+      id: String(diagnosticId),
+      patientId: String(patientId),
+      medicalRecordId: String(medicalRecordId)
+    }
+  });
+
+  if (!diagnostic) {
+    const e = new Error("El diagnóstico no existe o no pertenece al paciente especificado"); e.status = 404; throw e;
   }
 
   const cat = isDocCategory(category) ? category : "GENERAL";
   const normalizedPath = path.normalize(file.path)
 
+  const documentData = {
+    patientId: String(patientId),
+    medicalRecordId: String(medicalRecordId),
+    diagnosticId: String(diagnosticId),
+    filename: file.originalname,
+    storeFilename: file.filename,
+    filePath: normalizedPath,
+    mimeType: file.mimetype,
+    fileSize: file.size,
+    fileType: extFromMime(file.mimetype),
+    description,
+    category: cat,
+    uploadedBy: String(userId)
+  };
+
   const doc = await prisma.document.create({
-    data: {
-      patientId: String(patientId),
-      medicalRecordId: String(medicalRecordId),
-      diagnosticId: String(diagnosticId),
-      filename: file.originalname,
-      storeFilename: file.filename,
-      filePath: normalizedPath,
-      mimeType: file.mimetype,
-      fileSize: file.size,
-      fileType: extFromMime(file.mimetype),
-      description,
-      uploadedBy: String(userId)
-    }
+    data: documentData
   });
+
   return doc;
 }
 
@@ -63,13 +90,7 @@ async function listByPatient(patientId, q) {
 
   const where = {
     patientId: String(patientId),
-
-    // <--- clave: incluir null y "no existe"
-    OR: [
-      { deleteAt: null },
-      { deleteAt: { isSet: false } }
-    ],
-
+    
     ...(medicalRecordId ? { medicalRecordId: String(medicalRecordId) } : {}),
     ...(diagnosticId   ? { diagnosticId:   String(diagnosticId)   } : {}),
     ...(category       ? { category:       String(category)        } : {}),
@@ -77,19 +98,28 @@ async function listByPatient(patientId, q) {
     ...(search         ? { filename: { contains: String(search), mode:'insensitive' } } : {}),
   };
 
-  console.log("[DOC][listByPatient] where =", JSON.stringify(where));
 
-  const [items, total] = await Promise.all([
-    prisma.document.findMany({ where, orderBy: { createdAt: "desc" }, skip, take }),
+
+  const [allItems, allTotal] = await Promise.all([
+    prisma.document.findMany({ where, orderBy: { createdAt: "desc" } }),
     prisma.document.count({ where })
   ]);
+
+  // Filtrar documentos no eliminados manualmente (más confiable con MongoDB)
+  const activeItems = allItems.filter(item => !item.deleteAt);
+  
+  // Aplicar paginación después del filtrado
+  const total = activeItems.length;
+  const items = activeItems.slice(skip, skip + take);
 
   return { items, total, page: Number(page), pageSize: take };
 }
 
 async function getById(id) {
   const d = await prisma.document.findUnique({ where: { id } });
-  return d && (d.deleteAt == null) ? d : null; // null o undefined
+  
+  // Retornar null si el documento está eliminado
+  return (d && !d.deleteAt) ? d : null;
 }
 
 

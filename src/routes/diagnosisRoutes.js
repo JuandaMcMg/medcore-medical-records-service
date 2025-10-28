@@ -10,6 +10,13 @@ router.use(verifyToken)
 router.post(
   '/:patientId/diagnostics', authorizeRoles("MEDICO","ADMINISTRADOR"), uploadMultiple, diagnosticsController.createDiagnostic
 );
+
+// GET http://localhost:3005/api/v1/diagnosis/medical-record/:medicalRecordId
+router.get(
+  '/medical-record/:medicalRecordId', 
+  authorizeRoles("MEDICO","ADMINISTRADOR","ENFERMERO"), 
+  diagnosticsController.getByMedicalRecord
+);
 /*
 router.get('/:patientId',
     authorizeRoles("MEDICO","ADMINISTRADOR"),               // 3) luego: valida permisos

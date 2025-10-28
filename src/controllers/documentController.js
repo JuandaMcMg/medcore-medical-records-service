@@ -7,6 +7,10 @@ const { ensurePatientExists, auditLog } = require("../services/integrations");
 const isObjectId = id => /^[0-9a-fA-F]{24}$/.test(String(id || ""))
 async function upload(req, res) {
   try {
+    console.log('[DOC][upload] req.body:', req.body);
+    console.log('[DOC][upload] req.file:', req.file ? 'Present' : 'Missing');
+    console.log('[DOC][upload] patientId from body:', req.body.patientId);
+    
     // Validar paciente contra monolito/MS
     const ok = await ensurePatientExists(req.body.patientId, req.headers.authorization || "");
     if (!ok) return res.status(404).json({ message: "Paciente no existe" });
@@ -44,16 +48,38 @@ async function download(req, res) {
 
   const doc = await getById(req.params.id);
   if (!doc) return res.status(404).json({ message: "Documento no encontrado" });
-  if (!fs.existsSync(doc.filePath)) return res.status(404).json({ message: "Archivo no existe" });
+  
+  // Construir el path completo desde la raíz del proyecto
+  const fullPath = path.resolve(__dirname, '../../', doc.filePath);
+  console.log('[DOWNLOAD] Document path from DB:', doc.filePath);
+  console.log('[DOWNLOAD] Full resolved path:', fullPath);
+  console.log('[DOWNLOAD] File exists:', fs.existsSync(fullPath));
+  
+  if (!fs.existsSync(fullPath)) {
+    console.log('[DOWNLOAD] File not found at:', fullPath);
+    return res.status(404).json({ message: "Archivo no existe en el servidor" });
+  }
 
-  res.setHeader("Content-Type", doc.mimeType);
-  res.setHeader("Content-Length", String(doc.fileSize));
-  res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(doc.filename)}"`);
-  fs.createReadStream(path.resolve(doc.filePath)).pipe(res);
-
-  const stream = fs.createReadStream(path.resolve(doc.filePath));
-  stream.on("error", () => res.status(500).end());
-  stream.pipe(res);
+  try {
+    // Configurar headers para descarga
+    res.setHeader("Content-Type", doc.mimeType);
+    res.setHeader("Content-Length", String(doc.fileSize));
+    res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(doc.filename)}"`);
+    
+    // Crear stream y manejar errores
+    const stream = fs.createReadStream(fullPath);
+    stream.on("error", (error) => {
+      console.error('[DOWNLOAD] Stream error:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ message: "Error al leer el archivo" });
+      }
+    });
+    
+    stream.pipe(res);
+  } catch (error) {
+    console.error('[DOWNLOAD] Error:', error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
 }
 
 

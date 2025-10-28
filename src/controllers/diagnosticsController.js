@@ -10,7 +10,6 @@ const createDiagnostic = async (req, res) => {
   try {
     const { patientId } = req.params;
     const doctorId = req.user?.id;        // asumimos que auth middleware setea req.user
-    console.log('[controller] doctorId:', doctorId); // debug 1 vez
     const files = req.files || [];         // array de archivos de multer
     const authHeader = req.headers.authorization || "";
 
@@ -77,6 +76,34 @@ const createDiagnostic = async (req, res) => {
   }
 };
 
+/**
+ * GET /diagnosis/medical-record/:medicalRecordId
+ * Obtiene todos los diagnósticos asociados a una historia clínica
+ */
+const getByMedicalRecord = async (req, res) => {
+  try {
+    const { medicalRecordId } = req.params;
+    
+    if (!medicalRecordId) {
+      return res.status(400).json({ message: "medicalRecordId es requerido" });
+    }
+
+    // Obtener diagnósticos del servicio
+    const diagnostics = await diagnosticService.getByMedicalRecord(medicalRecordId);
+
+    return res.status(200).json({
+      message: "Diagnósticos obtenidos exitosamente",
+      data: diagnostics,
+    });
+  } catch (error) {
+    console.error("Error obteniendo diagnósticos por medical record:", error);
+    return res.status(500).json({
+      message: error.message || "Error al obtener diagnósticos",
+    });
+  }
+};
+
 module.exports = {
   createDiagnostic,
+  getByMedicalRecord,
 };

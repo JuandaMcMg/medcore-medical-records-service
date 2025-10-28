@@ -3,7 +3,11 @@ const { makeClient } = require("./http");
 
 const USER_SERVICE_URL   = process.env.USER_SERVICE_URL || "";
 const AUTH_SERVICE_URL  = process.env.AUTH_SERVICE_URL || "";
-const AUDIT_SERVICE_URL  = process.env.AUDIT_SERVICE_URL || "";        
+const AUDIT_SERVICE_URL  = process.env.AUDIT_SERVICE_URL || "";
+
+// Rutas de endpoints para servicios de autenticación
+const AUTH_USER_PATH = process.env.AUTH_USER_PATH || "/api/v1/users/{id}";
+const AUTH_PATIENT_PATH = process.env.AUTH_PATIENT_PATH || "/api/v1/patients/{id}";        
 
 const VALIDATE_PATIENT   = (process.env.VALIDATE_PATIENT ?? "true").toLowerCase() !== "false";
 const VALIDATE_DOCTOR    = (process.env.VALIDATE_DOCTOR  ?? "true").toLowerCase() !== "false";
@@ -116,19 +120,28 @@ async function ensurePatientExists(patientId, authHeader) {
   return false;
 }
 
-// MEDICO : Endopint de doctr
+// MEDICO : Endpoint de doctor
 async function ensureDoctorExists(doctorId, authHeader) {
   if (!VALIDATE_DOCTOR) return true;
 
+  console.log('[ensureDoctorExists] Verificando existencia del doctor:', doctorId);
   
   if (userClient) {
-    const d = await tryGet(userClient, `/api/users/${doctorId}`, authHeader);
-    if (d) return true;
+    const d = await tryGet(userClient, `/api/v1/users/${doctorId}`, authHeader);
+    if (d) {
+      console.log('[ensureDoctorExists] Doctor encontrado en servicio de usuarios');
+      return true;
+    }
   }
   if (authClient) {
     const d = await tryGet(authClient, fillId(AUTH_USER_PATH, doctorId), authHeader);
-    if (d) return true;
+    if (d) {
+      console.log('[ensureDoctorExists] Doctor encontrado en servicio de autenticación');
+      return true;
+    }
   }
+  
+  console.log('[ensureDoctorExists] Doctor NO encontrado en ningún servicio');
   return false;
 }
 
