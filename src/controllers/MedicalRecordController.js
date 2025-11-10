@@ -79,7 +79,10 @@ const getMedicalRecordById = async (req, res) => {
       where: { id },
       include: {
         prescriptions: true,
-        labResults: true
+        labResults: true,
+        diagnostic:
+          { include: { documents: true } },
+        documents: true
       }
     });
 
@@ -89,19 +92,9 @@ const getMedicalRecordById = async (req, res) => {
         service: "medical-records-service"
       });
     }
-    // Trae documentos del medical record
-    const documents = await prisma.document.findMany({
-      where: { 
-        medicalRecordId: String(id), 
-        patientId: String(medicalRecord.patientId), 
-        deleteAt: null 
-      },
-      orderBy: { createdAt: "desc" }
-    });
 
     return res.status(200).json({
       data: medicalRecord, 
-      documents, 
       medicalRecordId: id,
       service: "medical-records-service"
     });
@@ -263,10 +256,41 @@ const archiveMedicalRecord = async (req, res) => {
   }
 };
 
+// GET /api/v1/medical-records/by-patient/:patientId
+const listByPatient = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+
+    const records = await prisma.medicalRecord.findMany({
+      where: { patientId },
+      orderBy: { date: "desc" },
+      select: {
+        id: true,
+        date: true,
+        symptoms: true,
+        diagnosis: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return res.json({
+      items: records,
+      total: records.length,
+      patientId,
+    });
+  } catch (e) {
+    console.error("listByPatient", e);
+    return res.status(500).json({ message: "Error listando historias del paciente" });
+  }
+};
+
 module.exports = {
   createMedicalRecord,
   getMedicalRecordById,
   listMedicalRecords,
   updateMedicalRecord,
-  archiveMedicalRecord
+  archiveMedicalRecord,
+  listByPatient
 };

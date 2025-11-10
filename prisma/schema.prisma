@@ -43,6 +43,7 @@ model MedicalRecord {
   // (No se almacenan realmente en MongoDB, son solo para Prisma)
   prescriptions Prescription[]
   labResults    LabResult[]
+  documents     Document[]
   diagnostic    Diagnostics[]
 }
 
@@ -109,7 +110,7 @@ model Diagnostics {
 model Document {
   id              String      @id @default(auto()) @map("_id") @db.ObjectId
   diagnosticId    String      @db.ObjectId
-  medicalRecordId String
+  medicalRecordId String      @db.ObjectId
   patientId       String      @db.ObjectId
   category        DocCategory @default(GENERAL)
   filename        String //Nombre original del archivo
@@ -124,7 +125,8 @@ model Document {
   createdAt       DateTime    @default(now())
 
   //Relaciones
-  diagnostic Diagnostics @relation(fields: [diagnosticId], references: [id], onDelete: Cascade)
+  diagnostic    Diagnostics   @relation(fields: [diagnosticId], references: [id], onDelete: Cascade)
+  medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id])
 
   @@index([diagnosticId])
   @@index([patientId])
