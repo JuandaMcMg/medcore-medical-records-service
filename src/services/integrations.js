@@ -84,7 +84,7 @@ async function ensurePatientExists(patientId, authHeader) {
     }
     
     // Intentar con la ruta específica de pacientes
-    const patientPath = `/api/v1/users/role/PACIENTE/${patientId}`;
+    const patientPath = `/api/v1/users/patients/${patientId}`;
     const patientData = await tryGet(userClient, patientPath, authHeader);
     
     if (patientData) {
