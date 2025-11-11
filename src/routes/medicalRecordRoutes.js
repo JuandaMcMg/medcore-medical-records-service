@@ -7,7 +7,8 @@ const {
   getMedicalRecordById,
   listMedicalRecords,
   updateMedicalRecord,
-  archiveMedicalRecord
+  archiveMedicalRecord, 
+  listByPatient
 } = require("../controllers/MedicalRecordController");
 
 const router = express.Router();
@@ -19,6 +20,14 @@ router.post("/", authorizeRoles("MEDICO", "ADMINISTRADOR"),sanitizeInputs, creat
 
 // GET http://localhost:3005/api/v1//medical-records/:id Ver Historia
 router.get("/:id", authorizeRoles("MEDICO", "ADMINISTRADOR"), getMedicalRecordById);
+
+router.get("/by-patient/:patientId",
+  authorizeRoles("MEDICO","ADMINISTRADOR","ENFERMERO"),
+  listByPatient
+);
+
+
+
 
 // GET http://localhost:3005/api/v1//medical-records/ Listar Historias
 router.get("/", authorizeRoles("MEDICO", "ADMINISTRADOR"), listMedicalRecords);
