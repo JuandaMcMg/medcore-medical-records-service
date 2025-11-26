@@ -19,12 +19,14 @@ router.use(verifyToken)
 router.post("/", authorizeRoles("MEDICO", "ADMINISTRADOR"),sanitizeInputs, createMedicalRecord);
 
 // GET http://localhost:3005/api/v1//medical-records/:id Ver Historia
-router.get("/:id", authorizeRoles("MEDICO", "ADMINISTRADOR"), getMedicalRecordById);
-
+// IMPORTANTE: Colocar rutas más específicas ANTES de rutas genéricas con parámetros.
+// Si "/:id" va antes, Express capturará "/by-patient/:patientId" como id = "by-patient".
 router.get("/by-patient/:patientId",
   authorizeRoles("MEDICO","ADMINISTRADOR","ENFERMERO"),
   listByPatient
 );
+
+router.get("/:id", authorizeRoles("MEDICO", "ADMINISTRADOR"), getMedicalRecordById);
 
 
 

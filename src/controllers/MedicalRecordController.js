@@ -75,14 +75,16 @@ const getMedicalRecordById = async (req, res) => {
     const { id } = req.params;
 
     // Buscar el registro médico con prescripciones y resultados de laboratorio
+    // NOTA: Se removió 'documents: true' porque el cliente Prisma activo no reconoce
+    // la relación 'documents' en MedicalRecord, generando PrismaClientValidationError.
+    // Solución raíz: ejecutar 'npx prisma generate' en el microservicio para actualizar el cliente.
+    // Mientras tanto retornamos el registro sin esa relación para evitar 500.
     const medicalRecord = await prisma.medicalRecord.findUnique({
       where: { id },
       include: {
         prescriptions: true,
         labResults: true,
-        diagnostic:
-          { include: { documents: true } },
-        documents: true
+        diagnostic: { include: { documents: true } }
       }
     });
 
