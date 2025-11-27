@@ -25,6 +25,27 @@ enum DocCategory {
   LAB
 }
 
+// Tipos de órdenes médicas
+enum MedicalOrderType {
+  LABORATORY
+  RADIOLOGY
+}
+
+// Estado de la orden
+enum MedicalOrderStatus {
+  DRAFT
+  ORDERED
+  COMPLETED
+  CANCELLED
+}
+
+// Prioridad clínica
+enum MedicalOrderPriority {
+  ROUTINE
+  URGENT
+  STAT
+}
+
 // Modelo para registros médicos
 model MedicalRecord {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
@@ -133,4 +154,29 @@ model Document {
   @@index([category])
   @@index([medicalRecordId])
   @@index([deleteAt])
+}
+
+// Modelo para Órdenes Médicas
+model MedicalOrder {
+  id              String               @id @default(auto()) @map("_id") @db.ObjectId
+  patientId       String               @db.ObjectId
+  doctorId        String               @db.ObjectId
+  medicalRecordId String?              @db.ObjectId
+  type            MedicalOrderType
+  priority        MedicalOrderPriority @default(ROUTINE)
+  status          MedicalOrderStatus   @default(ORDERED)
+  notes           String?
+
+  // Listas nativas en MongoDB
+  labTests       String[] // para type=LABORATORY
+  radiologyExams String[] // para type=RADIOLOGY
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([medicalRecordId])
+  @@index([type])
+  @@index([status])
 }

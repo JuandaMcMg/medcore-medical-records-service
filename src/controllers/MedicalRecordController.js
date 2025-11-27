@@ -88,6 +88,12 @@ const getMedicalRecordById = async (req, res) => {
       }
     });
 
+    // Cargar órdenes médicas asociadas a esta historia (lab/radiología)
+    const orders = await prisma.medicalOrder.findMany({
+      where: { medicalRecordId: id },
+      orderBy: { createdAt: 'desc' }
+    });
+
     if (!medicalRecord) {
       return res.status(404).json({
         message: "Registro médico no encontrado",
@@ -96,7 +102,8 @@ const getMedicalRecordById = async (req, res) => {
     }
 
     return res.status(200).json({
-      data: medicalRecord, 
+      data: medicalRecord,
+      orders,
       medicalRecordId: id,
       service: "medical-records-service"
     });
