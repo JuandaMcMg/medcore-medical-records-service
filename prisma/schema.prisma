@@ -46,32 +46,44 @@ enum MedicalOrderPriority {
   STAT
 }
 
+enum DiagnosisType {
+  PRIMARY
+  SECONDARY
+}
+
 // Modelo para registros médicos
 model MedicalRecord {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  patientId   String   @db.ObjectId
-  physicianId String   @db.ObjectId
-  date        DateTime @default(now())
-  symptoms    String
-  diagnosis   String?
-  treatment   String?
-  notes       String?
-  status      String   @default("active") // "active", "archived"
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  patientId     String   @db.ObjectId
+  physicianId   String   @db.ObjectId //doctor
+  appointmentId String   @db.ObjectId //Relacion con la cita
+  date          DateTime @default(now())
+  symptoms      String
+  diagnosis     String?
+  treatment     String?
+  notes         String?
+  status        String   @default("active") // "active", "archived"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // Relaciones virtuales para navegación en Prisma
-  // (No se almacenan realmente en MongoDB, son solo para Prisma)
   prescriptions Prescription[]
   labResults    LabResult[]
   documents     Document[]
   diagnostic    Diagnostics[]
+
+  @@index([patientId])
+  @@index([physicianId])
+  @@index([appointmentId])
 }
 
 // Modelo para prescripciones
 model Prescription {
   id               String    @id @default(auto()) @map("_id") @db.ObjectId
   medicalRecordId  String    @db.ObjectId
+  doctorId         String    @db.ObjectId
+  diagnosticId     String?   @db.ObjectId
+  patientId        String    @db.ObjectId
   medication       String
   dosage           String
   frequency        String
@@ -82,8 +94,8 @@ model Prescription {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  // Relación con el registro médico
   medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id])
+
 }
 
 // Modelo para resultados de laboratorio
@@ -104,28 +116,49 @@ model LabResult {
   medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id])
 }
 
+model DiseaseCatalog {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  code        String // p.ej. "J00"
+  name        String // p.ej. "Rinitis aguda (resfriado común)"
+  description String?
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([code])
+}
+
 model Diagnostics {
-  id              String          @id @default(auto()) @map("_id") @db.ObjectId
-  patientId       String          @db.ObjectId
-  doctorId        String          @db.ObjectId
-  medicalRecordId String          @db.ObjectId
+  id              String @id @default(auto()) @map("_id") @db.ObjectId
+  patientId       String @db.ObjectId
+  doctorId        String @db.ObjectId
+  medicalRecordId String @db.ObjectId
+
+  // Relación con catálogo
+  diseaseCode String // referencia a DiseaseCatalog.code
+  diseaseName String // copia del nombre del catálogo para consulta rápida
+  type        DiagnosisType @default(SECONDARY) // PRIMARY o SECONDARY
+
+  // Campos narrativos (opcional, los puedes conservar)
   title           String
   description     String
-  diagnosis       String
+  diagnosis       String // texto libre si quieres mantenerlo
   treatment       String
   observations    String?
   nextAppointment DateTime?
-  state           diagnosticState @default(ACTIVE)
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
 
-  //Relaciones
+  state     diagnosticState @default(ACTIVE)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
   medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id])
   documents     Document[]
 
   @@index([patientId])
   @@index([doctorId])
   @@index([medicalRecordId])
+  @@index([diseaseCode])
 }
 
 model Document {

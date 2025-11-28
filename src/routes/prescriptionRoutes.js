@@ -2,49 +2,38 @@
 const express = require("express");
 const { verifyToken } = require("../middlewares/authMiddleware");
 const { sanitizeInputs } = require("../middlewares/sanitizeMiddleware");
-const {
-  createPrescription,
-  getPrescriptionById,
-  listPrescriptions,
-  updatePrescription,
-  deletePrescription
-} = require("../controllers/PrescriptionController");
+const PrescriptionController = require("../controllers/PrescriptionController");
 
 const router = express.Router();
 
-/**
- * @route POST /api/v1/prescriptions
- * @desc Crear una nueva prescripción
- * @access Privado - Requiere autenticación
- */
-router.post("/", [verifyToken, sanitizeInputs], createPrescription);
+router.use(verifyToken)
 
-/**
- * @route GET /api/v1/prescriptions/:id
- * @desc Obtener una prescripción por ID
- * @access Privado - Requiere autenticación
- */
-router.get("/:id", verifyToken, getPrescriptionById);
+//POST http://localhost:3005/api/v1/prescriptions
+//Crear una nueva prescipcion
+router.post("/", [verifyToken,sanitizeInputs], PrescriptionController.createPrescription);
 
-/**
- * @route GET /api/v1/prescriptions
- * @desc Listar prescripciones con filtros
- * @access Privado - Requiere autenticación
- */
-router.get("/", verifyToken, listPrescriptions);
+//GET http://localhost:3005/api/v1/prescriptions/patient/patientID
+//Historial de prescripciones por paciente
+router.get("/patient/:patientId", PrescriptionController.prescriptionByPatient);
 
-/**
- * @route PUT /api/v1/prescriptions/:id
- * @desc Actualizar una prescripción
- * @access Privado - Requiere autenticación
- */
-router.put("/:id", [verifyToken, sanitizeInputs], updatePrescription);
+//GET http://localhost:3005/api/v1/prescriptions/:id
+//Obtener prescripcion por id
+router.get("/:id", PrescriptionController.getPrescriptionById);
 
-/**
- * @route DELETE /api/v1/prescriptions/:id
- * @desc Eliminar una prescripción
- * @access Privado - Requiere autenticación
- */
-router.delete("/:id", verifyToken, deletePrescription);
+//GET http://localhost:3005/api/v1/prescriptions
+//Lista de prescipciones
+router.get("/", PrescriptionController.listPrescriptions);
+
+//GET http://localhost:3005/api/v1/prescriptions/:id/pdf
+//Obtener PDF de una prescripcion
+router.get("/:id/pdf", verifyToken, PrescriptionController.getPrescriptionById);
+
+//PUT http://localhost:3005/api/v1/prescriptions/:id
+//Actualizar una prescripcion por id
+router.put("/:id", [verifyToken, sanitizeInputs], PrescriptionController.updatePrescription);
+
+//DELETE http://localhost:3005/api/v1/prescriptions/:id
+//Eliminar una prescripcion
+router.delete("/:id", PrescriptionController.deletePrescription);
 
 module.exports = router;

@@ -13,7 +13,17 @@ class DiagnosticService {
    */
   async createDiagnostic(patientId, doctorId, diagnosticData, files) {
     try{
-      const { medicalRecordId } = diagnosticData;
+      const { medicalRecordId,
+        title,
+        description,
+        diagnosis,
+        treatment,
+        observations,
+        nextAppointment,
+        diseaseCode,
+        diseaseName,
+        type, // PRIMARY 
+        } = diagnosticData;
 
       if (!medicalRecordId) {
         throw new Error("medicalRecordId es obligatorio para crear el diagnóstico");
@@ -35,24 +45,27 @@ class DiagnosticService {
 
         //crear diagnóstico + documentos
         const diagnostic = await prisma.$transaction(async (tx) => {
-            //1 Crear diagnóstico
+            //Crear diagnóstico
             const newDiagnostic = await tx.diagnostics.create({
             data: {
                 patientId: String(patientId),
                 doctorId: String(doctorId),
                 medicalRecordId: String(medicalRecordId),
-                title: diagnosticData.title,
-                description: diagnosticData.description,
-                diagnosis: diagnosticData.diagnosis,
-                treatment: diagnosticData.treatment,
-                observations: diagnosticData.observations ?? null,
+                title,
+                description,
+                diagnosis,
+                treatment,
+                observations: observations ?? null,
                 nextAppointment: diagnosticData.nextAppointment
                 ? new Date(diagnosticData.nextAppointment)
                 : null,
+                diseaseCode: String(diseaseCode),
+                diseaseName: diseaseName || "",
+                type: type || "SECONDARY",
             },
             });
 
-            //2 Crear documentos (si hay)
+            //Crear documentos (si hay)
             if (files && files.length > 0) {
             const documentRecords = files.map((file) => ({
                 patientId: String(patientId),
@@ -105,7 +118,7 @@ class DiagnosticService {
         where: { 
           medicalRecordId: String(medicalRecordId),
           state: 'ACTIVE' // Solo diagnósticos activos
-        },
+        },  
         include: {
           documents: true // Incluir documentos asociados
         },
