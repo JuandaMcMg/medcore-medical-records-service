@@ -1,14 +1,14 @@
 // controllers/MedicalRecordController.js
 const { PrismaClient } = require("../generated/prisma");
 const prisma = new PrismaClient();
-const {ensurePatientExists, ensureDoctorExists, auditLog} = require("../services/integrations")
+const integrations = require("../services/integrations")
 
 /**
  * Crear un nuevo registro médico
  */
 const createMedicalRecord = async (req, res) => {
   try {
-    const { patientId, symptoms, diagnosis, treatment, notes } = req.body;
+    const { patientId, symptoms, diagnosis, treatment, notes, appointmentId } = req.body;
     const physicianId = req.user.id;
     const auth = req.headers.authorization || "";
 
@@ -21,11 +21,11 @@ const createMedicalRecord = async (req, res) => {
     }
 
     // Valida paciente por HTTP (ID = frontera entre MS)
-    const okPatient = await ensurePatientExists(patientId, auth);
+    const okPatient = await integrations.ensurePatientExists(patientId, auth);
     if (!okPatient) return res.status(404).json({ message: "Paciente no existe" });
 
     // Valida Doctor por HTTP (ID = frontera entre MS)
-    const okDoct = await ensureDoctorExists(physicianId, auth);
+    const okDoct = await integrations.ensureDoctorExists(physicianId, auth);
     
     if (!okDoct) {
       return res.status(404).json({ 
@@ -34,13 +34,35 @@ const createMedicalRecord = async (req, res) => {
         tip: "Verifica que el ID sea correcto y que el servicio de usuarios esté disponible."
       });
     }
+
+    //Validar citas
+    let appointmentInfo = null;
+    if (appointmentId) {
+      const validation = await integrations.validateAppointmentForPatient(
+        appointmentId,
+        patientId,
+        auth
+      );
+
+      if (!validation.ok) {
+        return res.status(400).json({
+          message: "La cita no es válida para este paciente",
+          reason: validation.reason,
+          appointment: validation.appointment || null
+        });
+      }
+      appointmentInfo = validation.appointment;
+    }
     
+    // 4) Obtener info del paciente para retornarla al front
+    const patientInfo = await integrations.getPatientInfo(patientId, auth);
 
     // Crear el registro médico
     const medicalRecord = await prisma.medicalRecord.create({
       data: {
         patientId: String(patientId),
         physicianId: String(physicianId),
+        appointmentId: String(appointmentId),
         symptoms,
         diagnosis: diagnosis?? null,
         treatment: treatment?? null,
@@ -50,11 +72,13 @@ const createMedicalRecord = async (req, res) => {
     });
 
     //AuditLog
-    await auditLog({ action:"MEDICAL_RECORD_CREATE", entity:"MedicalRecord", entityId: medicalRecord.id, actorId: req.user.id }, auth);
+    await integrations.auditLog({ action:"MEDICAL_RECORD_CREATE", entity:"MedicalRecord", entityId: medicalRecord.id, actorId: req.user.id }, auth);
     
     return res.status(201).json({
       message: "Registro médico creado exitosamente",
       data: medicalRecord,
+      patient: patientInfo || null,
+      appointmentId: appointmentInfo || null,
       service: "medical-records-service"
     });
   } catch (error) {
@@ -295,11 +319,48 @@ const listByPatient = async (req, res) => {
   }
 };
 
+//GET http://localhost:3005/api/v1//medical-records/:appointmentId
+//Obtener Historia medica por cita 
+const getByAppointmentId = async (req, res) => {
+  try {
+    const { appointmentId } = req.params;
+
+    const record = await prisma.medicalRecord.findFirst({
+      where: { appointmentId },
+      include: {
+        prescriptions: true,
+        labResults: true,
+        diagnostic: { include: { documents: true } },
+      },
+      orderBy: { date: "desc" },
+    });
+
+    if (!record) {
+      return res.status(404).json({
+        message: "No hay registro médico asociado a esta cita",
+        service: "medical-records-service",
+      });
+    }
+
+    return res.json({
+      data: record,
+      service: "medical-records-service",
+    });
+  } catch (e) {
+    console.error("getByAppointmentId", e);
+    return res.status(500).json({
+      message: "Error obteniendo historia por cita",
+      service: "medical-records-service",
+    });
+  }
+};
+
 module.exports = {
   createMedicalRecord,
   getMedicalRecordById,
   listMedicalRecords,
   updateMedicalRecord,
   archiveMedicalRecord,
-  listByPatient
+  listByPatient,
+  getByAppointmentId
 };

@@ -1,13 +1,17 @@
 // src/services/integrations.js
 const { makeClient } = require("./http");
 
-const USER_SERVICE_URL   = process.env.USER_SERVICE_URL || "";
-const AUTH_SERVICE_URL  = process.env.AUTH_SERVICE_URL || "";
-const AUDIT_SERVICE_URL  = process.env.AUDIT_SERVICE_URL || "";
+const USER_SERVICE_URL       = process.env.USER_SERVICE_URL || "";
+const AUTH_SERVICE_URL       = process.env.AUTH_SERVICE_URL || "";
+const AUDIT_SERVICE_URL      = process.env.AUDIT_SERVICE_URL || "";
+const APPOINTMENT_SERVICE_URL = process.env.APPOINTMENT_SERVICE_URL || "";
 
 // Rutas de endpoints para servicios de autenticación
 const AUTH_USER_PATH = process.env.AUTH_USER_PATH || "/api/v1/users/{id}";
 const AUTH_PATIENT_PATH = process.env.AUTH_PATIENT_PATH || "/api/v1/patients/{id}";        
+
+// Rutas para el servicio de citas
+const APPOINTMENT_BY_ID_PATH = process.env.APPOINTMENT_BY_ID_PATH || "/api/v1/appointments/by-id/{id}";
 
 const VALIDATE_PATIENT   = (process.env.VALIDATE_PATIENT ?? "true").toLowerCase() !== "false";
 const VALIDATE_DOCTOR    = (process.env.VALIDATE_DOCTOR  ?? "true").toLowerCase() !== "false";
@@ -15,6 +19,7 @@ const VALIDATE_DOCTOR    = (process.env.VALIDATE_DOCTOR  ?? "true").toLowerCase(
 const userClient = USER_SERVICE_URL  ? makeClient(USER_SERVICE_URL)  : null;
 const authClient = AUTH_SERVICE_URL ? makeClient(AUTH_SERVICE_URL) : null;
 const auditClient = AUDIT_SERVICE_URL ? makeClient(AUDIT_SERVICE_URL) : null;
+const appointmentClient = APPOINTMENT_SERVICE_URL ? makeClient(APPOINTMENT_SERVICE_URL) : null;
 
 function fillId(tmpl, id) {
   return (tmpl || "").replace("{id}", encodeURIComponent(id));
@@ -176,9 +181,88 @@ async function getUserDetails(userId, authHeader) {
   return null;
 }
 
+/**
+ * Devuelve la información del paciente (no solo true/false)
+ * prioriza el microservicio de usuarios y luego el monolito/auth
+ */
+async function getPatientInfo(patientId, authHeader) {
+  // 1) Microservicio de usuarios
+  if (userClient) {
+    // ruta específica de pacientes
+    const patientPath = `/api/v1/users/patients/${patientId}`;
+    const p1 = await tryGet(userClient, patientPath, authHeader);
+    if (p1) return p1;
+
+    // fallback: ruta genérica de usuarios
+    const userPath = `/api/v1/users/by-user/${patientId}`;
+    const p2 = await tryGet(userClient, userPath, authHeader);
+    if (p2) return p2;
+  }
+
+  // 2) Monolito / servicio de auth
+  if (authClient) {
+    const authPatientPath = fillId(AUTH_PATIENT_PATH, patientId);
+    const p3 = await tryGet(authClient, authPatientPath, authHeader);
+    if (p3) return p3;
+
+    const authUserPath = fillId(AUTH_USER_PATH, patientId);
+    const p4 = await tryGet(authClient, authUserPath, authHeader);
+    if (p4) return p4;
+  }
+
+  return null;
+}
+
+/**
+ * Obtiene una cita por ID desde el servicio de citas
+ */
+async function getAppointmentById(appointmentId, authHeader) {
+  if (!appointmentClient || !appointmentId) return null;
+
+  const path = fillId(APPOINTMENT_BY_ID_PATH, appointmentId);
+  const data = await tryGet(appointmentClient, path, authHeader);
+
+  // según cómo responde tu MS de citas, ajusta esto:
+  // si el controlador devuelve { data: appointment }, devolvemos data.data
+  if (data && data.data) return data.data;
+  return data || null;
+}
+
+/**
+ * Valida que una cita:
+ * - exista
+ * - pertenezca a ese paciente
+ * - no esté en estado cancelado / no show
+ */
+async function validateAppointmentForPatient(appointmentId, patientId, authHeader) {
+  if (!appointmentId) {
+    return { ok: false, reason: "NO_APPOINTMENT" };
+  }
+
+  const appt = await getAppointmentById(appointmentId, authHeader);
+
+  if (!appt) {
+    return { ok: false, reason: "NOT_FOUND" };
+  }
+
+  if (String(appt.patientId) !== String(patientId)) {
+    return { ok: false, reason: "PATIENT_MISMATCH", appointment: appt };
+  }
+
+  if (["CANCELLED", "NO_SHOW"].includes(appt.status)) {
+    return { ok: false, reason: "INVALID_STATUS", appointment: appt };
+  }
+
+  return { ok: true, appointment: appt };
+}
+
+
 module.exports = { 
   ensurePatientExists, 
   ensureDoctorExists, 
   auditLog,
-  getUserDetails 
+  getUserDetails,
+  getPatientInfo,
+  getAppointmentById,
+  validateAppointmentForPatient
 };

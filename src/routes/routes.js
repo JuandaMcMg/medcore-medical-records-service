@@ -8,6 +8,7 @@ const diagnosticsRoutes = require("./diagnosticsRoutes")
 const diagnosisRoutes = require("./diagnosisRoutes")
 const documentRoutes = require("./documentRoutes")
 const patientSearchRoutes = require("./patientSearchRoutes")
+const diseaseCatalogRoutes = require("./diseaseCatalogRoutes")
 
 //http://localhost:3005/api/v1/
 
@@ -19,4 +20,5 @@ router.use("/diagnostics", diagnosticsRoutes);
 router.use("/diagnosis", diagnosisRoutes);
 router.use("/documents", documentRoutes);
 router.use("/patients", patientSearchRoutes);
+router.use("/diseases", diseaseCatalogRoutes);
 module.exports = router;
