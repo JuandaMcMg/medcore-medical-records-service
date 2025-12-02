@@ -1,5 +1,7 @@
 const diagnosticService = require("../services/diagnostic.service");
 const { ensurePatientExists, ensureDoctorExists, auditLog } = require("../services/integrations");
+const { PrismaClient } = require("../generated/prisma");
+const prisma = new PrismaClient();
 
 /**
  * POST /diagnostics/:patientId
@@ -14,9 +16,10 @@ const createDiagnostic = async (req, res) => {
     const authHeader = req.headers.authorization || "";
 
     // ---- Validación de campos requeridos ----
-    const { title, description, diagnosis, treatment } = req.body;
+    const { medicalRecordId, diseaseCode,type, title, description, diagnosis:diagnosisText, treatment, nextAppointment } = req.body;
 
-    if (!title || !description ||  !diagnosis || !treatment) {
+    //Validar campos requeridos mínimos
+    if (!medicalRecordId || !diseaseCode || !title || !description || !treatment) {
       // si ya subió archivos, los eliminamos
       if (files.length > 0) {
         const fs = require("fs").promises;
@@ -30,11 +33,11 @@ const createDiagnostic = async (req, res) => {
       }
       return res.status(400).json({
         message: "Faltan campos obligatorios",
-        required: ["title", "description", "diagnosis", "treatment"],
+        required: ["medicalRecordId", "diseaseCode", "title", "description", "treatment"],
       });
     }
 
-    //Validar cross-MS por HTTP
+    //Validar paciente y doctor
     const [okP, okD] = await Promise.all([
       ensurePatientExists(patientId, authHeader),
       ensureDoctorExists(doctorId,  authHeader),
@@ -42,11 +45,70 @@ const createDiagnostic = async (req, res) => {
     if (!okP) return res.status(404).json({ message: "Paciente no existe" });
     if (!okD) return res.status(404).json({ message: "Doctor no existe" });
 
+    //Validar que la historia existe y pertenece a ese paciente y doctor
+    const medicalRecord = await prisma.medicalRecord.findUnique({
+      where: { id: String(medicalRecordId) },
+    });
+
+    if (!medicalRecord) {
+      return res.status(404).json({ message: "Historia clínica no existe" });
+    }
+
+    if (String(medicalRecord.patientId) !== String(patientId)) {
+      return res.status(400).json({
+        message: "La historia clínica no pertenece a este paciente",
+      });
+    }
+
+    if (String(medicalRecord.physicianId) !== String(doctorId)) {
+      return res.status(403).json({
+        message: "La historia clínica no pertenece a este médico",
+      });
+    }
+
+    //Validar que el diseaseCode existe en el catálogo
+    const disease = await prisma.diseaseCatalog.findUnique({
+      where: { code: String(diseaseCode) },
+    });
+
+    if (!disease || !disease.isActive) {
+      return res.status(400).json({
+        message: "El código de enfermedad no existe o está inactivo",
+        diseaseCode,
+      });
+    }
+    
+    //Si viene type=PRIMARY, validar que no haya ya uno PRIMARY para esta historia
+    const diagnosisType = type && type.toUpperCase() === "PRIMARY" ? "PRIMARY" : "SECONDARY";
+
+    if (diagnosisType === "PRIMARY") {
+      const existingPrimary = await prisma.diagnostics.findFirst({
+        where: {
+          medicalRecordId: String(medicalRecordId),
+          type: "PRIMARY",
+          state: "ACTIVE",
+        },
+      });
+      if (existingPrimary) {
+        return res.status(400).json({
+          message: "Ya existe un diagnóstico principal para esta historia clínica",
+        });
+      }
+    }
     // ---- Crear diagnóstico (servicio maneja verificación de paciente/doctor y transacción) ----
     const diagnostic = await diagnosticService.createDiagnostic(
       patientId,
       doctorId,
-      req.body,
+      {
+        ...req.body,
+        medicalRecordId: String(medicalRecordId),
+        diseaseCode: disease.code,
+        diseaseName: disease.name,
+        type: diagnosisType,
+        diagnosis:
+        (diagnosisText && diagnosisText.trim()) ||
+        `${disease.code} - ${disease.name}`,
+      },
       files
     );
 
