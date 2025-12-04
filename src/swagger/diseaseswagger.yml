@@ -1,0 +1,299 @@
+openapi: 3.0.0
+info:
+  title: MedCore - Disease Catalog API
+  version: 1.0.0
+  description: >
+    Endpoints del catálogo de enfermedades (DiseaseCatalog) para el microservicio
+    de historias médicas. Todos requieren usuario autenticado.
+
+servers:
+  - url: http://localhost:3005/api/v1/diseases
+    description: Servidor local de Diseases
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Disease:
+      type: object
+      properties:
+        id:
+          type: string
+          description: ID interno de la enfermedad
+        code:
+          type: string
+          description: Código de la enfermedad (ej. J00, E11)
+          example: J00
+        name:
+          type: string
+          description: Nombre de la enfermedad
+          example: Resfriado común
+        description:
+          type: string
+          nullable: true
+          example: Infección aguda de las vías respiratorias superiores.
+        isActive:
+          type: boolean
+          description: Indica si la enfermedad está activa en el catálogo
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    DiseaseListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Disease'
+        total:
+          type: integer
+        query:
+          type: string
+          nullable: true
+
+paths:
+  /:
+    get:
+      summary: Listar enfermedades del catálogo
+      description: >
+        Lista enfermedades del catálogo con filtro opcional por texto y estado.
+        Requiere roles MEDICO, ADMINISTRADOR o ENFERMERO.
+      tags:
+        - Disease Catalog
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: q
+          schema:
+            type: string
+          required: false
+          description: Texto de búsqueda en code o name.
+        - in: query
+          name: isActive
+          schema:
+            type: string
+            enum: ["true", "false", "1", "0"]
+          required: false
+          description: Filtrar por enfermedades activas/inactivas.
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 50
+          required: false
+          description: Límite máximo de registros a devolver (1–50).
+      responses:
+        '200':
+          description: Lista de enfermedades
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiseaseListResponse'
+        '500':
+          description: Error al listar enfermedades
+
+    post:
+      summary: Crear una enfermedad
+      description: >
+        Crea una nueva enfermedad en el catálogo.
+        Requiere rol ADMINISTRADOR.
+      tags:
+        - Disease Catalog
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+                - name
+              properties:
+                code:
+                  type: string
+                  example: J00
+                name:
+                  type: string
+                  example: Resfriado común
+                description:
+                  type: string
+                  nullable: true
+                  example: Infección aguda de las vías respiratorias superiores.
+                isActive:
+                  type: boolean
+                  description: Si no se envía, se asume true.
+      responses:
+        '201':
+          description: Enfermedad creada exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Enfermedad creada exitosamente
+                  data:
+                    $ref: '#/components/schemas/Disease'
+        '400':
+          description: Faltan campos obligatorios (code, name)
+        '409':
+          description: Ya existe una enfermedad con ese código
+        '500':
+          description: Error al crear enfermedad
+
+  /code/{code}:
+    get:
+      summary: Obtener enfermedad por código
+      description: >
+        Devuelve la información de una enfermedad específica a partir de su código
+        (ej. J00, E11). Requiere roles MEDICO, ADMINISTRADOR o ENFERMERO.
+      tags:
+        - Disease Catalog
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: code
+          required: true
+          schema:
+            type: string
+          description: Código de la enfermedad.
+      responses:
+        '200':
+          description: Enfermedad encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Disease'
+        '400':
+          description: No se envió código
+        '404':
+          description: Enfermedad no encontrada
+        '500':
+          description: Error al obtener enfermedad por código
+
+  /{id}:
+    get:
+      summary: Obtener enfermedad por ID
+      description: >
+        Devuelve una enfermedad específica del catálogo por su ID interno.
+        Requiere roles MEDICO, ADMINISTRADOR o ENFERMERO.
+      tags:
+        - Disease Catalog
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID interno de la enfermedad.
+      responses:
+        '200':
+          description: Enfermedad encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Disease'
+        '404':
+          description: Enfermedad no encontrada
+        '500':
+          description: Error al obtener enfermedad
+
+    put:
+      summary: Actualizar una enfermedad
+      description: >
+        Actualiza campos de una enfermedad (code, name, description, isActive).
+        Requiere rol ADMINISTRADOR.
+      tags:
+        - Disease Catalog
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID interno de la enfermedad.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  description: Nuevo código (opcional).
+                name:
+                  type: string
+                  description: Nuevo nombre (opcional).
+                description:
+                  type: string
+                  nullable: true
+                  description: Nueva descripción (opcional).
+                isActive:
+                  type: boolean
+                  description: Activar/desactivar enfermedad.
+      responses:
+        '200':
+          description: Enfermedad actualizada exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Enfermedad actualizada exitosamente
+                  data:
+                    $ref: '#/components/schemas/Disease'
+        '400':
+          description: No hay campos para actualizar
+        '404':
+          description: Enfermedad no encontrada
+        '409':
+          description: Ya existe otra enfermedad con ese código
+        '500':
+          description: Error al actualizar enfermedad
+
+    delete:
+      summary: Eliminar (soft delete) una enfermedad
+      description: >
+        Marca una enfermedad como inactiva (isActive = false). No la elimina físicamente.
+        Requiere rol ADMINISTRADOR.
+      tags:
+        - Disease Catalog
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID interno de la enfermedad.
+      responses:
+        '200':
+          description: Enfermedad marcada como inactiva o ya estaba inactiva
+        '404':
+          description: Enfermedad no encontrada
+        '500':
+          description: Error al eliminar enfermedad

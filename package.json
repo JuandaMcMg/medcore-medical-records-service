@@ -24,8 +24,11 @@
     "morgan": "^1.10.0",
     "multer": "^2.0.2",
     "pdfkit": "^0.17.2",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
     "uuid": "^13.0.0",
-    "xss": "^1.0.14"
+    "xss": "^1.0.14",
+    "yamljs": "^0.3.0"
   },
   "devDependencies": {
     "jest": "^29.6.1",

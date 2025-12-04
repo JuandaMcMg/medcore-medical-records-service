@@ -1,0 +1,415 @@
+openapi: 3.0.0
+info:
+  title: MedCore - Medical Records API
+  version: 1.0.0
+  description: >
+    Endpoints de historias clínicas del microservicio medical-records.
+    Todas las rutas requieren usuario autenticado mediante JWT.
+
+servers:
+  - url: http://localhost:3005/api/v1/medical-records
+    description: Servidor local de Medical Records (ajusta puerto si es otro)
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    MedicalRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        patientId:
+          type: string
+        physicianId:
+          type: string
+        appointmentId:
+          type: string
+          nullable: true
+        date:
+          type: string
+          format: date-time
+        symptoms:
+          type: string
+        diagnosis:
+          type: string
+          nullable: true
+        treatment:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        status:
+          type: string
+          description: Estado del registro (active, archived, etc.)
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Pagination:
+      type: object
+      properties:
+        total:
+          type: integer
+        pages:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+paths:
+  /:
+    post:
+      summary: Crear un nuevo registro médico
+      description: >
+        Crea una nueva historia clínica asociada a un paciente y (opcionalmente) a una cita.
+        Requiere rol MEDICO o ADMINISTRADOR.
+      tags:
+        - Medical Records
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - patientId
+                - symptoms
+              properties:
+                patientId:
+                  type: string
+                  example: 6914172d7f5d7ca29d3af99e
+                appointmentId:
+                  type: string
+                  nullable: true
+                  example: 69293769a80365658410bb69
+                symptoms:
+                  type: string
+                  example: Dolor lumbar de 3 días de evolución...
+                diagnosis:
+                  type: string
+                  nullable: true
+                treatment:
+                  type: string
+                  nullable: true
+                notes:
+                  type: string
+                  nullable: true
+      responses:
+        '201':
+          description: Registro médico creado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Registro médico creado exitosamente
+                  data:
+                    $ref: '#/components/schemas/MedicalRecord'
+                  patient:
+                    type: object
+                    description: Información básica del paciente (según servicio de usuarios)
+                    additionalProperties: true
+                  appointmentId:
+                    type: object
+                    nullable: true
+                    description: Información de la cita validada (si aplica)
+                    additionalProperties: true
+        '400':
+          description: Faltan campos obligatorios o la cita no es válida
+        '404':
+          description: Paciente o médico no existen / no válidos
+        '500':
+          description: Error al crear el registro médico
+
+    get:
+      summary: Listar registros médicos
+      description: >
+        Lista registros médicos con filtros opcionales por paciente, médico, estado y rango de fechas.
+        Requiere rol MEDICO o ADMINISTRADOR.
+      tags:
+        - Medical Records
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: patientId
+          schema:
+            type: string
+          required: false
+          description: Filtrar por ID de paciente.
+        - in: query
+          name: physicianId
+          schema:
+            type: string
+          required: false
+          description: Filtrar por ID de médico.
+        - in: query
+          name: status
+          schema:
+            type: string
+            example: active
+          required: false
+          description: Estado del registro (active, archived, etc.).
+        - in: query
+          name: fromDate
+          schema:
+            type: string
+            format: date
+          required: false
+          description: Fecha inicial (YYYY-MM-DD).
+        - in: query
+          name: toDate
+          schema:
+            type: string
+            format: date
+          required: false
+          description: Fecha final (YYYY-MM-DD).
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          required: false
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+          required: false
+      responses:
+        '200':
+          description: Lista paginada de registros médicos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MedicalRecord'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '500':
+          description: Error al listar los registros médicos
+
+  /by-patient/{patientId}:
+    get:
+      summary: Listar registros médicos de un paciente
+      description: >
+        Devuelve las historias clínicas de un paciente, ordenadas de la más reciente a la más antigua.
+        Requiere rol MEDICO, ADMINISTRADOR o ENFERMERO.
+      tags:
+        - Medical Records
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: patientId
+          required: true
+          schema:
+            type: string
+          description: ID del paciente.
+      responses:
+        '200':
+          description: Historias del paciente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        date:
+                          type: string
+                          format: date-time
+                        symptoms:
+                          type: string
+                        diagnosis:
+                          type: string
+                          nullable: true
+                        status:
+                          type: string
+                        createdAt:
+                          type: string
+                          format: date-time
+                        updatedAt:
+                          type: string
+                          format: date-time
+                  total:
+                    type: integer
+                  patientId:
+                    type: string
+        '500':
+          description: Error listando historias del paciente
+
+  /by-appointment/{appointmentId}:
+    get:
+      summary: Obtener registro médico por cita
+      description: >
+        Devuelve la historia clínica asociada a una cita específica.
+        Requiere rol MEDICO.
+      tags:
+        - Medical Records
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: appointmentId
+          required: true
+          schema:
+            type: string
+          description: ID de la cita.
+      responses:
+        '200':
+          description: Registro médico asociado a la cita
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/MedicalRecord'
+        '404':
+          description: No hay registro médico asociado a esta cita
+        '500':
+          description: Error obteniendo historia por cita
+
+  /{id}:
+    get:
+      summary: Obtener un registro médico por ID
+      description: >
+        Devuelve una historia clínica con sus prescripciones, resultados de laboratorio
+        y diagnóstico asociado.
+        Requiere rol MEDICO o ADMINISTRADOR.
+      tags:
+        - Medical Records
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID del registro médico.
+      responses:
+        '200':
+          description: Registro médico encontrado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/MedicalRecord'
+                  orders:
+                    type: array
+                    description: Órdenes médicas asociadas (lab/radiología)
+                    items:
+                      type: object
+                      additionalProperties: true
+                  medicalRecordId:
+                    type: string
+        '404':
+          description: Registro médico no encontrado
+        '500':
+          description: Error al obtener el registro médico
+
+    put:
+      summary: Actualizar un registro médico
+      description: >
+        Actualiza síntomas, diagnóstico, tratamiento, notas o estado
+        de una historia clínica existente. Requiere rol MEDICO o ADMINISTRADOR.
+      tags:
+        - Medical Records
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID del registro médico.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                symptoms:
+                  type: string
+                diagnosis:
+                  type: string
+                  nullable: true
+                treatment:
+                  type: string
+                  nullable: true
+                notes:
+                  type: string
+                  nullable: true
+                status:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Registro médico actualizado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Registro médico actualizado exitosamente
+                  data:
+                    $ref: '#/components/schemas/MedicalRecord'
+        '404':
+          description: Registro médico no encontrado
+        '500':
+          description: Error al actualizar el registro médico
+
+    delete:
+      summary: Archivar (soft delete) un registro médico
+      description: >
+        Marca el registro como archived. No se borra físicamente.
+        Requiere rol MEDICO o ADMINISTRADOR.
+      tags:
+        - Medical Records
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID del registro médico.
+      responses:
+        '200':
+          description: Registro médico archivado exitosamente
+        '404':
+          description: Registro médico no encontrado
+        '500':
+          description: Error al archivar el registro médico

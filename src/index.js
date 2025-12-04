@@ -8,9 +8,21 @@ const bodyParser = require("body-parser");
 const { connectDatabase } = require("./database/database");
 const { sanitizeInputs } = require("./middlewares/sanitizeMiddleware");
 const routes = require("./routes/routes")
+const swaggerUi = require('swagger-ui-express');
+const YAML =require('yamljs');
+const path = require("path");
 
 const port = process.env.PORT || 3005;
 const app = express();
+//Swagger Docs
+const diseasesDoc = YAML.load( path.join(__dirname, "swagger", "diseaseSwagger.yml"));
+app.use( "/api-docs/diseases", swaggerUi.serve, swaggerUi.setup(diseasesDoc));
+
+const medicalRecordsDoc = YAML.load( path.join(__dirname, "swagger", "medicalRswagger.yml"));
+app.use( "/api-docs/medical-records", swaggerUi.serve, swaggerUi.setup(medicalRecordsDoc));
+
+const medicalOrderDoc = YAML.load( path.join(__dirname, "swagger", "medicalOswagger.yml"));
+app.use( "/api-docs/medical-Orders", swaggerUi.serve, swaggerUi.setup(medicalOrderDoc));
 
 // Middlewares
 app.use(cors({

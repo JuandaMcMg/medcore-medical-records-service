@@ -1,0 +1,323 @@
+openapi: 3.0.0
+info:
+  title: MedCore - Medical Orders API
+  version: 1.0.0
+  description: >
+    Endpoints de órdenes médicas (laboratorio y radiología).
+    Todas las rutas requieren usuario autenticado mediante JWT.
+
+servers:
+  - url: http://localhost:3005/api/v1/medical-orders
+    description: Servidor local de Medical Orders (ajusta puerto si es otro)
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    MedicalOrder:
+      type: object
+      properties:
+        id:
+          type: string
+        patientId:
+          type: string
+        doctorId:
+          type: string
+        medicalRecordId:
+          type: string
+        type:
+          type: string
+          description: Tipo de orden
+          enum: [LABORATORY, RADIOLOGY]
+        priority:
+          type: string
+          enum: [ROUTINE, URGENT, STAT]
+        status:
+          type: string
+          enum: [DRAFT, ORDERED, COMPLETED, CANCELLED]
+        labTests:
+          type: array
+          items:
+            type: string
+            example: Hemograma
+        radiologyExams:
+          type: array
+          items:
+            type: string
+            example: Rayos X
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+paths:
+  /templates:
+    get:
+      summary: Obtener plantillas y catálogos de órdenes
+      description: >
+        Devuelve las listas permitidas de exámenes de laboratorio, estudios de radiología,
+        prioridades y estados posibles de una orden.
+        Requiere rol MEDICO, ENFERMERO o ADMINISTRADOR.
+      tags:
+        - Medical Orders
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Plantillas de órdenes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      laboratory:
+                        type: array
+                        description: Exámenes de laboratorio permitidos
+                        items:
+                          type: string
+                          example: Hemograma
+                      radiology:
+                        type: array
+                        description: Estudios de radiología permitidos
+                        items:
+                          type: string
+                          example: Rayos X
+                      priorities:
+                        type: array
+                        items:
+                          type: string
+                          enum: [ROUTINE, URGENT, STAT]
+                      statuses:
+                        type: array
+                        items:
+                          type: string
+                          enum: [DRAFT, ORDERED, COMPLETED, CANCELLED]
+        '500':
+          description: Error obteniendo plantillas
+
+  /patient/{patientId}:
+    get:
+      summary: Listar órdenes de un paciente
+      description: >
+        Lista las órdenes médicas de un paciente, con filtros opcionales por tipo y estado.
+        Requiere rol MEDICO, ENFERMERO o ADMINISTRADOR.
+      tags:
+        - Medical Orders
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: patientId
+          required: true
+          schema:
+            type: string
+          description: ID del paciente.
+        - in: query
+          name: type
+          required: false
+          schema:
+            type: string
+            enum: [LABORATORY, RADIOLOGY]
+          description: Filtrar por tipo de orden.
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [DRAFT, ORDERED, COMPLETED, CANCELLED]
+          description: Filtrar por estado de la orden.
+      responses:
+        '200':
+          description: Órdenes del paciente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MedicalOrder'
+        '500':
+          description: Error listando órdenes del paciente
+
+  /laboratory:
+    post:
+      summary: Crear orden de laboratorio
+      description: >
+        Crea una orden de laboratorio asociada a un paciente y a una historia clínica.
+        Valida que el paciente, el doctor y la historia existan y que pertenezcan al paciente.
+        Requiere rol MEDICO o ADMINISTRADOR.
+      tags:
+        - Medical Orders
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - patientId
+                - doctorId
+                - medicalRecordId
+                - tests
+              properties:
+                patientId:
+                  type: string
+                  example: "43cd3308-da3f-493f-84fa-e8e0750889de"
+                doctorId:
+                  type: string
+                  example: "fdcb9519-714c-4b75-9707-e763aebc9c00"
+                medicalRecordId:
+                  type: string
+                  example: "69296a36496779212b9c0558"
+                tests:
+                  type: array
+                  description: Lista de exámenes de laboratorio a solicitar
+                  items:
+                    type: string
+                    example: Hemograma
+                notes:
+                  type: string
+                  nullable: true
+                  example: Paciente con fatiga y palidez.
+                priority:
+                  type: string
+                  enum: [ROUTINE, URGENT, STAT]
+                  example: URGENT
+      responses:
+        '201':
+          description: Orden de laboratorio creada exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/MedicalOrder'
+        '400':
+          description: Datos inválidos (falta medicalRecordId, tests vacíos, prioridad inválida, etc.)
+        '404':
+          description: Paciente o doctor no existen / historia clínica no pertenece al paciente
+        '500':
+          description: Error creando orden de laboratorio
+
+  /radiology:
+    post:
+      summary: Crear orden de radiología
+      description: >
+        Crea una orden de radiología asociada a un paciente y a una historia clínica.
+        Valida que el paciente, el doctor y la historia existan y que pertenezcan al paciente.
+        Requiere rol MEDICO o ADMINISTRADOR.
+      tags:
+        - Medical Orders
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - patientId
+                - doctorId
+                - medicalRecordId
+                - exams
+              properties:
+                patientId:
+                  type: string
+                doctorId:
+                  type: string
+                medicalRecordId:
+                  type: string
+                exams:
+                  type: array
+                  description: Lista de estudios de radiología a solicitar
+                  items:
+                    type: string
+                    example: Rayos X
+                notes:
+                  type: string
+                  nullable: true
+                priority:
+                  type: string
+                  enum: [ROUTINE, URGENT, STAT]
+                  example: ROUTINE
+      responses:
+        '201':
+          description: Orden de radiología creada exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/MedicalOrder'
+        '400':
+          description: Datos inválidos (falta medicalRecordId, exams vacíos, prioridad inválida, etc.)
+        '404':
+          description: Paciente o doctor no existen / historia clínica no pertenece al paciente
+        '500':
+          description: Error creando orden de radiología
+
+  /{id}:
+    get:
+      summary: Obtener orden por ID
+      description: >
+        Devuelve una orden médica por su ID.
+        Requiere rol MEDICO, ENFERMERO o ADMINISTRADOR.
+      tags:
+        - Medical Orders
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID de la orden médica.
+      responses:
+        '200':
+          description: Orden encontrada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/MedicalOrder'
+        '404':
+          description: Orden no encontrada
+        '500':
+          description: Error obteniendo orden

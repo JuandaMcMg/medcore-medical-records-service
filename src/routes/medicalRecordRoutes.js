@@ -19,9 +19,9 @@ router.get("/:id", authorizeRoles("MEDICO", "ADMINISTRADOR"), MedicalRecordContr
 // GET http://localhost:3005/api/v1//medical-records/ Listar Historias
 router.get("/", authorizeRoles("MEDICO", "ADMINISTRADOR"), MedicalRecordController.listMedicalRecords);
 
-//GET http://localhost:3005/api/v1//medical-records/:appointmentId
+//GET http://localhost:3005/api/v1//medical-records/by-appointment/:appointmentId
 //Obtener Historia medica por cita 
-router.get("/:appointmentId", authorizeRoles("MEDICO"), MedicalRecordController.getByAppointmentId)
+router.get("/by-appointment/:appointmentId", authorizeRoles("MEDICO"), MedicalRecordController.getByAppointmentId)
 
 
 // PUT http://localhost:3005/api/v1//medical-records/:Id
