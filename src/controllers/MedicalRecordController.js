@@ -9,6 +9,9 @@ const integrations = require("../services/integrations")
 const createMedicalRecord = async (req, res) => {
   try {
     const { patientId, symptoms, diagnosis, treatment, notes, appointmentId } = req.body;
+
+
+
     const physicianId = req.user.id;
     const auth = req.headers.authorization || "";
 

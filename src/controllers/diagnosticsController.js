@@ -79,22 +79,28 @@ const createDiagnostic = async (req, res) => {
     }
     
     //Si viene type=PRIMARY, validar que no haya ya uno PRIMARY para esta historia
-    const diagnosisType = type && type.toUpperCase() === "PRIMARY" ? "PRIMARY" : "SECONDARY";
+   // const diagnosisType = type && type.toUpperCase() === "PRIMARY" ? "PRIMARY" : "SECONDARY";
 
-    if (diagnosisType === "PRIMARY") {
-      const existingPrimary = await prisma.diagnostics.findFirst({
-        where: {
-          medicalRecordId: String(medicalRecordId),
-          type: "PRIMARY",
-          state: "ACTIVE",
-        },
-      });
-      if (existingPrimary) {
+   // if (diagnosisType === "PRIMARY") {
+     // Buscar si ya existe un diagnóstico principal para esta historia clínica
+const existingPrimary = await prisma.diagnostics.findFirst({
+  where: {
+    medicalRecordId: String(medicalRecordId),
+    type: "PRIMARY",
+    state: "ACTIVE",
+  },
+});
+
+// Aplicar lógica opción B
+const diagnosisType = existingPrimary ? "SECONDARY" : "PRIMARY";
+
+    /*  if (existingPrimary) {
         return res.status(400).json({
           message: "Ya existe un diagnóstico principal para esta historia clínica",
         });
-      }
-    }
+      }*/
+    
+    
     // ---- Crear diagnóstico (servicio maneja verificación de paciente/doctor y transacción) ----
     const diagnostic = await diagnosticService.createDiagnostic(
       patientId,

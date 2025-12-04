@@ -95,7 +95,6 @@ model Prescription {
   updatedAt        DateTime  @updatedAt
 
   medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id])
-
 }
 
 // Modelo para resultados de laboratorio

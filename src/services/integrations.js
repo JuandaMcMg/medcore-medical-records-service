@@ -217,17 +217,33 @@ async function getPatientInfo(patientId, authHeader) {
  * Obtiene una cita por ID desde el servicio de citas
  */
 async function getAppointmentById(appointmentId, authHeader) {
-  if (!appointmentClient || !appointmentId) return null;
+  if (!appointmentClient || !appointmentId) {
+    console.log('❌ [getAppointmentById] No hay cliente o appointmentId:', {
+      hasClient: !!appointmentClient,
+      appointmentId
+    });
+    return null;
+  }
 
   const path = fillId(APPOINTMENT_BY_ID_PATH, appointmentId);
+  
+  // ✅ AGREGAR ESTE LOG
+  console.log('🔍 [getAppointmentById] Intentando buscar cita:', {
+    appointmentId,
+    APPOINTMENT_BY_ID_PATH,
+    path,
+    baseURL: appointmentClient?.defaults?.baseURL,
+    fullURL: (appointmentClient?.defaults?.baseURL || '') + path
+  });
+  
   const data = await tryGet(appointmentClient, path, authHeader);
 
-  // según cómo responde tu MS de citas, ajusta esto:
-  // si el controlador devuelve { data: appointment }, devolvemos data.data
+  // ✅ AGREGAR ESTE LOG
+  console.log('📦 [getAppointmentById] Resultado:', data);
+
   if (data && data.data) return data.data;
   return data || null;
 }
-
 /**
  * Valida que una cita:
  * - exista
